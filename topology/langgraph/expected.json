@@ -1,0 +1,88 @@
+{
+ "attestedBy": "agent-image",
+ "complete": true,
+ "declaredFramework": "langgraph",
+ "edges": [
+  {
+   "condition": null,
+   "dst": "classify",
+   "src": "start"
+  },
+  {
+   "condition": null,
+   "dst": "reply",
+   "src": "billing"
+  },
+  {
+   "condition": "conditional",
+   "dst": "billing",
+   "src": "classify"
+  },
+  {
+   "condition": "conditional",
+   "dst": "returns",
+   "src": "classify"
+  },
+  {
+   "condition": null,
+   "dst": "reply",
+   "src": "returns"
+  },
+  {
+   "condition": null,
+   "dst": "end",
+   "src": "reply"
+  }
+ ],
+ "framework": "langgraph",
+ "frameworkMatchesDeclaration": true,
+ "inspectionAdapter": "runnable-graph",
+ "mechanism": "runtime-inspection",
+ "nodes": [
+  {
+   "hitl": false,
+   "id": "start",
+   "prompt": "",
+   "tools": [],
+   "type": "tool"
+  },
+  {
+   "hitl": false,
+   "id": "classify",
+   "prompt": "",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "billing",
+   "prompt": "",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "returns",
+   "prompt": "",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "reply",
+   "prompt": "",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "end",
+   "prompt": "",
+   "tools": [],
+   "type": "completion"
+  }
+ ],
+ "notes": [],
+ "schemaVersion": 1,
+ "status": "complete"
+}

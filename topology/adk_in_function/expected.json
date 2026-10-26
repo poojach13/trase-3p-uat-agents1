@@ -1,0 +1,13 @@
+{
+ "attestedBy": "agent-image",
+ "complete": false,
+ "declaredFramework": "adk",
+ "edges": [],
+ "mechanism": "runtime-inspection",
+ "nodes": [],
+ "notes": [
+  "We couldn't show this agent's topology. Expose the constructed ADK agent as a module-level `root_agent` in the entrypoint module (or in `agent.py` beside it). Agents created only when a function runs can't be inspected."
+ ],
+ "schemaVersion": 1,
+ "status": "unsupported"
+}

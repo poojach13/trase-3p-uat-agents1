@@ -1,0 +1,92 @@
+{
+ "attestedBy": "agent-image",
+ "complete": true,
+ "declaredFramework": "strands",
+ "edges": [
+  {
+   "condition": null,
+   "dst": "triage",
+   "src": "start"
+  },
+  {
+   "condition": "handoff",
+   "dst": "support/returns",
+   "src": "support/billing"
+  },
+  {
+   "condition": null,
+   "dst": "writer",
+   "src": "support/billing"
+  },
+  {
+   "condition": null,
+   "dst": "writer",
+   "src": "support/returns"
+  },
+  {
+   "condition": "needs_review",
+   "dst": "support/billing",
+   "src": "triage"
+  },
+  {
+   "condition": null,
+   "dst": "end",
+   "src": "writer"
+  }
+ ],
+ "framework": "strands",
+ "frameworkMatchesDeclaration": true,
+ "inspectionAdapter": "strands-agent-graph",
+ "mechanism": "runtime-inspection",
+ "nodes": [
+  {
+   "hitl": false,
+   "id": "start",
+   "prompt": "",
+   "tools": [],
+   "type": "tool"
+  },
+  {
+   "hitl": false,
+   "id": "triage",
+   "prompt": "Route the customer.",
+   "tools": [
+    "lookup_order"
+   ],
+   "type": "agent"
+  },
+  {
+   "hitl": true,
+   "id": "support/billing",
+   "prompt": "Handle billing.",
+   "tools": [
+    "handoff_to_user"
+   ],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "support/returns",
+   "prompt": "Handle returns.",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "writer",
+   "prompt": "Write the reply.",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "end",
+   "prompt": "",
+   "tools": [],
+   "type": "completion"
+  }
+ ],
+ "notes": [],
+ "schemaVersion": 1,
+ "status": "complete"
+}

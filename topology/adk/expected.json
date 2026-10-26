@@ -1,0 +1,150 @@
+{
+ "attestedBy": "agent-image",
+ "complete": true,
+ "declaredFramework": "adk",
+ "edges": [
+  {
+   "condition": null,
+   "dst": "pipeline/triage",
+   "src": "start"
+  },
+  {
+   "condition": "tool",
+   "dst": "summarizer",
+   "src": "pipeline/triage"
+  },
+  {
+   "condition": "transfer",
+   "dst": "billing",
+   "src": "pipeline/triage"
+  },
+  {
+   "condition": "transfer",
+   "dst": "pipeline/triage",
+   "src": "billing"
+  },
+  {
+   "condition": "transfer",
+   "dst": "returns",
+   "src": "pipeline/triage"
+  },
+  {
+   "condition": null,
+   "dst": "pipeline/polish/fixer",
+   "src": "pipeline/polish/critic"
+  },
+  {
+   "condition": "loop (max 3)",
+   "dst": "pipeline/polish/critic",
+   "src": "pipeline/polish/fixer"
+  },
+  {
+   "condition": null,
+   "dst": "pipeline/polish/critic",
+   "src": "pipeline/triage"
+  },
+  {
+   "condition": null,
+   "dst": "pipeline/checks/fact",
+   "src": "pipeline/polish/fixer"
+  },
+  {
+   "condition": null,
+   "dst": "pipeline/checks/style",
+   "src": "pipeline/polish/fixer"
+  },
+  {
+   "condition": null,
+   "dst": "end",
+   "src": "pipeline/checks/fact"
+  },
+  {
+   "condition": null,
+   "dst": "end",
+   "src": "pipeline/checks/style"
+  }
+ ],
+ "framework": "adk",
+ "frameworkMatchesDeclaration": true,
+ "inspectionAdapter": "adk-agent-tree",
+ "mechanism": "runtime-inspection",
+ "nodes": [
+  {
+   "hitl": false,
+   "id": "start",
+   "prompt": "",
+   "tools": [],
+   "type": "tool"
+  },
+  {
+   "hitl": true,
+   "id": "pipeline/triage",
+   "prompt": "Route the customer.",
+   "tools": [
+    "lookup_order",
+    "request_refund",
+    "toolset:StubToolset"
+   ],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "summarizer",
+   "prompt": "Summarize.",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "billing",
+   "prompt": "Handle billing.",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "returns",
+   "prompt": "Handle returns.",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "pipeline/polish/critic",
+   "prompt": "Critique.",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "pipeline/polish/fixer",
+   "prompt": "Fix.",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "pipeline/checks/fact",
+   "prompt": "",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "pipeline/checks/style",
+   "prompt": "",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "end",
+   "prompt": "",
+   "tools": [],
+   "type": "completion"
+  }
+ ],
+ "notes": [],
+ "schemaVersion": 1,
+ "status": "complete"
+}

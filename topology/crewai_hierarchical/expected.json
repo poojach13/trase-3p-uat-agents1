@@ -1,0 +1,83 @@
+{
+ "attestedBy": "agent-image",
+ "complete": true,
+ "declaredFramework": "crewai",
+ "edges": [
+  {
+   "condition": null,
+   "dst": "manager",
+   "src": "start"
+  },
+  {
+   "condition": "delegate",
+   "dst": "Researcher",
+   "src": "manager"
+  },
+  {
+   "condition": "delegate",
+   "dst": "manager",
+   "src": "Researcher"
+  },
+  {
+   "condition": "delegate",
+   "dst": "Writer",
+   "src": "manager"
+  },
+  {
+   "condition": "delegate",
+   "dst": "manager",
+   "src": "Writer"
+  },
+  {
+   "condition": null,
+   "dst": "end",
+   "src": "manager"
+  }
+ ],
+ "framework": "crewai",
+ "frameworkMatchesDeclaration": true,
+ "inspectionAdapter": "crewai-crew",
+ "mechanism": "runtime-inspection",
+ "nodes": [
+  {
+   "hitl": false,
+   "id": "start",
+   "prompt": "",
+   "tools": [],
+   "type": "tool"
+  },
+  {
+   "hitl": false,
+   "id": "manager",
+   "prompt": "Delegates the crew's tasks and reviews the results.",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "Researcher",
+   "prompt": "Find the facts.",
+   "tools": [
+    "lookup_order"
+   ],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "Writer",
+   "prompt": "Write the reply.",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "end",
+   "prompt": "",
+   "tools": [],
+   "type": "completion"
+  }
+ ],
+ "notes": [],
+ "schemaVersion": 1,
+ "status": "complete"
+}

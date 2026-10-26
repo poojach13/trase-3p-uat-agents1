@@ -1,0 +1,3 @@
+name: uat-3p-langchain
+framework: langchain
+entrypoint: main:run

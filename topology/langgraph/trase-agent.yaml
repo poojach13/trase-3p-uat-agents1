@@ -1,0 +1,3 @@
+name: uat-topology-langgraph
+framework: langgraph
+entrypoint: main:run

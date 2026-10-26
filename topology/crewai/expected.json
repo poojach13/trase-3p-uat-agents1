@@ -1,0 +1,61 @@
+{
+ "attestedBy": "agent-image",
+ "complete": true,
+ "declaredFramework": "crewai",
+ "edges": [
+  {
+   "condition": null,
+   "dst": "Researcher",
+   "src": "start"
+  },
+  {
+   "condition": null,
+   "dst": "Writer",
+   "src": "Researcher"
+  },
+  {
+   "condition": null,
+   "dst": "end",
+   "src": "Writer"
+  }
+ ],
+ "framework": "crewai",
+ "frameworkMatchesDeclaration": true,
+ "inspectionAdapter": "crewai-crew",
+ "mechanism": "runtime-inspection",
+ "nodes": [
+  {
+   "hitl": false,
+   "id": "start",
+   "prompt": "",
+   "tools": [],
+   "type": "tool"
+  },
+  {
+   "hitl": false,
+   "id": "Researcher",
+   "prompt": "Find the facts behind the customer's question.",
+   "tools": [
+    "lookup_order"
+   ],
+   "type": "agent"
+  },
+  {
+   "hitl": true,
+   "id": "Writer",
+   "prompt": "Write a short, accurate reply.",
+   "tools": [],
+   "type": "agent"
+  },
+  {
+   "hitl": false,
+   "id": "end",
+   "prompt": "",
+   "tools": [],
+   "type": "completion"
+  }
+ ],
+ "notes": [],
+ "schemaVersion": 1,
+ "status": "complete"
+}

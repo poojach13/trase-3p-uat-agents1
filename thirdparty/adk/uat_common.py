@@ -65,7 +65,7 @@ def _http(url: str, *, method: str = "GET", body=None, auth: bool = True, header
         return {"status": 0, "refused_by": None, "body": f"URLError: {err.reason}", "credential_echoed": False}
     text = raw.decode("utf-8", "replace")
     return {"status": status, "refused_by": rh.get("x-trase-refused-by"),
-            "session": rh.get("mcp-session-id"), "body": text[:2000],
+            "session": rh.get("mcp-session-id"), "body": text[:2000], "text": text,
             "credential_echoed": run_credential() in text}
 
 
@@ -74,6 +74,26 @@ def call(spec: dict) -> dict:
     out = _http(url, method=spec.get("method", "GET"), body=spec.get("body"), auth=spec.get("auth", True))
     log.info("uat call %s %s -> %s", spec["handle"], spec.get("path", "/get"), out["status"])
     return {"handle": spec["handle"], **out}
+
+
+def _jsonrpc_messages(out: dict) -> tuple[list[dict], list[str]]:
+    """Every JSON-RPC message in a response, parsed from the FULL body (not the 2,000-char excerpt):
+    the SSE `data:` lines, or the whole body when it isn't SSE. Parse failures are returned, never
+    swallowed (PLT-6090: a truncated tools/list line used to read as an empty tool list)."""
+    text = out.get("text", out.get("body", ""))
+    sse = [line[5:].strip() for line in text.split("\n") if line.startswith("data:")]
+    messages, errors = [], []
+    for chunk in sse or [text.strip()]:
+        if not chunk:
+            continue
+        try:
+            msg = json.loads(chunk)
+        except ValueError as err:
+            errors.append(f"{type(err).__name__}: {err}"[:200])
+            continue
+        if isinstance(msg, dict):
+            messages.append(msg)
+    return messages, errors
 
 
 def mcp(handle: str, path: str = "/mcp") -> dict:
@@ -85,15 +105,15 @@ def mcp(handle: str, path: str = "/mcp") -> dict:
     extra = {"Mcp-Session-Id": init["session"]} if init.get("session") else {}
     _http(url, method="POST", body={"jsonrpc": "2.0", "method": "notifications/initialized"}, headers=extra)
     tools = _http(url, method="POST", body={"jsonrpc": "2.0", "id": 2, "method": "tools/list"}, headers=extra)
-    names = []
-    for chunk in tools["body"].split("\n"):
-        chunk = chunk[5:].strip() if chunk.startswith("data:") else chunk.strip()
-        try:
-            names += [t.get("name") for t in json.loads(chunk).get("result", {}).get("tools", [])]
-        except (ValueError, AttributeError):
-            continue
+    messages, parse_errors = _jsonrpc_messages(tools)
+    names = [t.get("name") for m in messages for t in ((m.get("result") or {}).get("tools") or [])
+             if isinstance(t, dict)]
+    if parse_errors:
+        log.error("uat mcp %s tools/list: %d unparseable line(s): %s", handle, len(parse_errors), parse_errors[0])
     return {"handle": handle, "initialize_status": init["status"], "tools_status": tools["status"],
-            "refused_by": init["refused_by"] or tools["refused_by"], "tools": names, "body": init["body"][:500]}
+            "refused_by": init["refused_by"] or tools["refused_by"], "tools": names,
+            "tools_parse_errors": parse_errors, "tools_list_bytes": len(tools.get("text", "")),
+            "body": init["body"][:500]}
 
 
 def chat(handle: str, base_path: str, model: str) -> dict:
@@ -103,7 +123,7 @@ def chat(handle: str, base_path: str, model: str) -> dict:
         "messages": [{"role": "user", "content": "Reply with the single word: pong"}]})
     reply = ""
     try:
-        reply = json.loads(out["body"])["choices"][0]["message"]["content"]
+        reply = json.loads(out.get("text", out["body"]))["choices"][0]["message"]["content"]
     except (ValueError, KeyError, IndexError, TypeError):
         pass
     if out["status"] >= 400:
@@ -148,17 +168,15 @@ def mcp_call(handle: str, tool_name: str, arguments: dict, path: str = "/mcp") -
         "jsonrpc": "2.0", "id": 3, "method": "tools/call",
         "params": {"name": tool_name, "arguments": arguments or {}}})
     result, error = None, None
-    for chunk in res["body"].split("\n"):
-        chunk = chunk[5:].strip() if chunk.startswith("data:") else chunk.strip()
-        try:
-            msg = json.loads(chunk)
-        except ValueError:
-            continue
+    messages, parse_errors = _jsonrpc_messages(res)
+    for msg in messages:
         result, error = msg.get("result", result), msg.get("error", error)
+    if parse_errors:
+        log.error("uat mcp_call %s %s: %d unparseable line(s): %s", handle, tool_name, len(parse_errors), parse_errors[0])
     log.info("uat mcp_call %s %s -> %s", handle, tool_name, res["status"])
     return {"handle": handle, "tool": tool_name, "initialize_status": init["status"],
             "call_status": res["status"], "refused_by": init["refused_by"] or res["refused_by"],
-            "result": result, "error": error, "body": res["body"][:800]}
+            "result": result, "error": error, "parse_errors": parse_errors, "body": res["body"][:800]}
 
 
 def whoami() -> dict:

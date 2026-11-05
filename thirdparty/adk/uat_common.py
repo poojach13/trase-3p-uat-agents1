@@ -179,6 +179,19 @@ def mcp_call(handle: str, tool_name: str, arguments: dict, path: str = "/mcp") -
             "result": result, "error": error, "parse_errors": parse_errors, "body": res["body"][:800]}
 
 
+def direct(url: str) -> dict:
+    """Call an upstream directly, around the gateway (MCP initialize). The sandbox should refuse it."""
+    try:
+        out = _http(url, method="POST", auth=False, body={
+            "jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "params": {"protocolVersion": "2025-03-26", "capabilities": {},
+                       "clientInfo": {"name": "trase-uat", "version": "1"}}})
+    except Exception as err:  # noqa: BLE001 - a reset or timeout IS the expected outcome
+        out = {"status": 0, "refused_by": None, "body": f"{type(err).__name__}: {err}"[:300]}
+    log.info("uat direct %s -> %s", url, out["status"])
+    return {"url": url, "status": out["status"], "body": str(out.get("body", ""))[:300]}
+
+
 def whoami() -> dict:
     cred = run_credential()
     return {"credential_fingerprint": hashlib.sha256(cred.encode()).hexdigest()[:16],
@@ -205,6 +218,8 @@ def dispatch(data: dict, framework: str, shout) -> dict:
         result = echo(data)
     elif mode == "big":
         result = big(data.get("kb", 64))
+    elif mode == "direct":
+        result = direct(data["url"])
     elif mode == "mcp_call":
         result = mcp_call(data["handle"], data["tool"], data.get("arguments") or {}, data.get("path", "/mcp"))
     else:

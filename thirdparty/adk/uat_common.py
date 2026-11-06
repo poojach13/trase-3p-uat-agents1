@@ -2,8 +2,10 @@
 
 One deployed agent covers every 3P story, chosen by the run input's "mode":
   {"mode": "shout", "text": T}                 -> {"shout": T.upper()}
-  {"mode": "call", "calls": [{handle, path, method?, body?, auth?}]}
-                                                -> one result per call (status, refused_by, body)
+  {"mode": "call", "calls": [{handle, path, method?, body?, auth?, headers?, content_type?, raw?, brief?}]}
+                                                -> one result per call (status, refused_by, body);
+                                                   content_type overrides the JSON Content-Type
+                                                   ("" sends none), raw sends a string body as-is
   {"mode": "mcp", "handle": H, "path": "/mcp"} -> MCP initialize + tools/list over the gateway
   {"mode": "chat", "handle": H, "base_path": P, "model": M}
                                                 -> one OpenAI-compatible chat call ("pong")
@@ -14,6 +16,10 @@ One deployed agent covers every 3P story, chosen by the run input's "mode":
   {"mode": "big", "kb": N}                     -> an N KB output (default 64), with its sha256
   {"mode": "mcp_call", "handle": H, "tool": T, "arguments": {...}}
                                                 -> MCP initialize + tools/call T over the gateway
+  {"mode": "mcp_calls", "handle": H, "calls": [{"tool": T, "arguments": {...}}]}
+                                                -> one MCP session, one tools/call per entry
+  {"mode": "chats", "handle": H, "base_path": P, "models": [M, ...]}
+                                                -> one chat call per model
 
 Calls never raise on HTTP errors, so tests can assert on refusal codes. The run credential is
 never returned; only a short SHA-256 fingerprint and whether an upstream echoed it.
@@ -46,16 +52,36 @@ def read() -> dict:
     return data or {}
 
 
-def _http(url: str, *, method: str = "GET", body=None, auth: bool = True, headers=None) -> dict:
+class _NoContentTypeRequest(urllib.request.Request):
+    """urllib adds application/x-www-form-urlencoded to any body without a Content-Type; this
+    request claims to have one so a body can go out with none at all."""
+
+    def has_header(self, header_name):
+        return header_name.lower() == "content-type" or super().has_header(header_name)
+
+
+_JSON = object()  # default: a JSON body goes out as application/json
+
+
+def _http(url: str, *, method: str = "GET", body=None, auth: bool = True, headers=None,
+          raw: str | None = None, content_type=_JSON) -> dict:
     h = {"Accept": "application/json, text/event-stream", "User-Agent": "trase-uat"}
     h.update(headers or {})
     if auth:
         h["Authorization"] = f"Bearer {run_credential()}"
     data = None
-    if body is not None:
+    if raw is not None:
+        data = raw.encode("utf-8")
+    elif body is not None:
         data = json.dumps(body).encode()
-        h["Content-Type"] = "application/json"
-    req = urllib.request.Request(url, data=data, headers=h, method=method)
+    if data is not None:
+        ctype = "application/json" if content_type is _JSON else content_type
+        if ctype:
+            h["Content-Type"] = ctype
+        else:
+            h.pop("Content-Type", None)
+    req = (_NoContentTypeRequest if data is not None and "Content-Type" not in h else urllib.request.Request)(
+        url, data=data, headers=h, method=method)
     try:
         with urllib.request.urlopen(req, timeout=90) as resp:
             status, rh, raw = resp.status, resp.headers, resp.read()
@@ -71,8 +97,13 @@ def _http(url: str, *, method: str = "GET", body=None, auth: bool = True, header
 
 def call(spec: dict) -> dict:
     url = f"{connection_url(spec['handle'])}{spec.get('path', '/get')}"
-    out = _http(url, method=spec.get("method", "GET"), body=spec.get("body"), auth=spec.get("auth", True))
+    out = _http(url, method=spec.get("method", "GET"), body=spec.get("body"), auth=spec.get("auth", True),
+                headers=spec.get("headers"), raw=spec.get("raw"),
+                content_type=spec["content_type"] if "content_type" in spec else _JSON)
     log.info("uat call %s %s -> %s", spec["handle"], spec.get("path", "/get"), out["status"])
+    if spec.get("brief"):  # many cases in one run: keep the run output small
+        return {"handle": spec["handle"], "status": out["status"], "refused_by": out["refused_by"],
+                "body": str(out.get("body", ""))[:200], "credential_echoed": out.get("credential_echoed", False)}
     return {"handle": spec["handle"], **out}
 
 
@@ -179,6 +210,41 @@ def mcp_call(handle: str, tool_name: str, arguments: dict, path: str = "/mcp") -
             "result": result, "error": error, "parse_errors": parse_errors, "body": res["body"][:800]}
 
 
+def mcp_calls(handle: str, calls: list, path: str = "/mcp") -> dict:
+    """One MCP session, then one tools/call per entry: many argument cases in one run."""
+    url = f"{connection_url(handle)}{path}"
+    init = _http(url, method="POST", body={
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": {"protocolVersion": "2025-03-26", "capabilities": {},
+                   "clientInfo": {"name": "trase-uat", "version": "1"}}})
+    extra = {"Mcp-Session-Id": init["session"]} if init.get("session") else {}
+    _http(url, method="POST", body={"jsonrpc": "2.0", "method": "notifications/initialized"}, headers=extra)
+    results = []
+    for i, c in enumerate(calls or []):
+        res = _http(url, method="POST", headers=extra, body={
+            "jsonrpc": "2.0", "id": 10 + i, "method": "tools/call",
+            "params": {"name": c["tool"], "arguments": c.get("arguments") or {}}})
+        result, error = None, None
+        messages, parse_errors = _jsonrpc_messages(res)
+        for msg in messages:
+            result, error = msg.get("result", result), msg.get("error", error)
+        log.info("uat mcp_calls %s %s -> %s", handle, c["tool"], res["status"])
+        results.append({"tool": c["tool"], "call_status": res["status"], "refused_by": res["refused_by"],
+                        "error": error, "is_error": bool((result or {}).get("isError")) if isinstance(result, dict) else None,
+                        "parse_errors": parse_errors, "body": res["body"][:400]})
+    return {"handle": handle, "initialize_status": init["status"], "init_refused_by": init["refused_by"],
+            "calls": results}
+
+
+def chats(handle: str, base_path: str, models: list) -> dict:
+    """One chat call per model through one MODEL connection."""
+    out = []
+    for m in models or []:
+        r = chat(handle, base_path, m)
+        out.append({k: r.get(k) for k in ("model", "status", "refused_by", "reply")} | {"body": str(r.get("body"))[:300]})
+    return {"handle": handle, "calls": out}
+
+
 def direct(url: str) -> dict:
     """Call an upstream directly, around the gateway (MCP initialize). The sandbox should refuse it."""
     try:
@@ -220,6 +286,10 @@ def dispatch(data: dict, framework: str, shout) -> dict:
         result = big(data.get("kb", 64))
     elif mode == "direct":
         result = direct(data["url"])
+    elif mode == "mcp_calls":
+        result = mcp_calls(data["handle"], data.get("calls") or [], data.get("path", "/mcp"))
+    elif mode == "chats":
+        result = chats(data["handle"], data.get("base_path", "/v1"), data.get("models") or [])
     elif mode == "mcp_call":
         result = mcp_call(data["handle"], data["tool"], data.get("arguments") or {}, data.get("path", "/mcp"))
     else:
